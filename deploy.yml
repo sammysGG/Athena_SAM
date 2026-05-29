@@ -60,6 +60,8 @@
       NEXTAUTH_SECRET="{{ lookup('pipe', 'openssl rand -hex 32') }}"
       NEXTAUTH_URL="https://{{ hostname }}.{{ domain }}"
       NODE_ENV="production"
+      DISCORD_BOT_TOKEN="{{ discord_bot_token | default('') }}"
+      DISCORD_CHANNEL_ID="{{ discord_channel_id | default('1509874086958862346') }}"
   when: new_deploy
 
 - name: Install dependencies (incl. dev deps needed for build + seed)
