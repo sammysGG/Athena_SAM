@@ -21,3 +21,6 @@ uploads/*
 
 # build artifacts
 *.tsbuildinfo
+
+# README is instructor/scenario notes — never ship to exercise targets
+README.md
