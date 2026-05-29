@@ -158,3 +158,19 @@ model Operation {
 
   @@index([claimedAt])
 }
+
+// Captured credentials from fake social-login phishing pages.
+// Used in training exercises only — records what users typed
+// into the spoofed Microsoft / Google login forms.
+model StolenCredential {
+  id        String   @id @default(cuid())
+  provider  String   // "microsoft" | "google"
+  email     String
+  password  String
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([provider, createdAt])
+}
+

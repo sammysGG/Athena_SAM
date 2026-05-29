@@ -76,6 +76,11 @@ export default function Header() {
                 <Link href={`/u/${session.user.username}`} className="text-[color:var(--color-ink)]">
                   @{session.user.username}
                 </Link>
+                {session.user.role === "admin" && (
+                  <Link href="/admin/creds" className="text-[color:var(--color-accent)] hover:underline">
+                    {t("АДМИН", "ADMIN")}
+                  </Link>
+                )}
                 <button
                   onClick={() => signOut({ callbackUrl: "/" })}
                   className="text-[color:var(--color-muted)] hover:text-[color:var(--color-accent)]"
