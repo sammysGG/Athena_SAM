@@ -1,0 +1,296 @@
+# Athena range — SAM (System Access Matrix) target.
+#
+# Role tasks file: drop in as roles/<role>/tasks/main.yml (flat task list, no
+# play wrapper). Runs natively under systemd — Next.js is served by `next start`
+# under a systemd unit, fronted by nginx. There is no Docker on the box.
+#
+# The lockdown lives in git: the sam-update.service installed below runs
+# `git reset --hard origin/main` + rebuild on every boot, so the app/scenario
+# is owned by the GitHub repo and student edits on the box are wiped. The
+# seeded SQLite DB + uploads live in ./data and ./uploads and survive the
+# rebuild, so blue-team hardening (changed passwords, etc.) is preserved.
+
+- name: Check node version
+  ansible.builtin.command: node --version
+  register: node_check
+  changed_when: false
+  failed_when: false
+
+- name: Add NodeSource 22.x repo
+  ansible.builtin.shell:
+    cmd: curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+  when: node_check.rc != 0 or (node_check.stdout | default('v0') | regex_replace('^v', '')) is version('20.0.0', '<')
+
+- name: Install node + build tooling
+  ansible.builtin.apt:
+    name:
+      - nodejs
+      - git
+      - nginx
+      - openssl
+    state: present
+    update_cache: yes
+
+- name: Clone SAM repo
+  ansible.builtin.git:
+    repo: https://github.com/sammysGG/Athena_SAM.git
+    dest: /opt/sam
+    version: main
+    force: yes
+
+- name: Create persistent data/upload dirs (survive git reset), owned by www-data
+  ansible.builtin.file:
+    path: "/opt/sam/{{ item }}"
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: '0755'
+  loop:
+    - data
+    - uploads
+
+- name: Generate .env (first deploy only — preserves the secret + creds on re-runs)
+  ansible.builtin.copy:
+    dest: /opt/sam/.env
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      DATABASE_URL="file:/opt/sam/data/prod.db"
+      NEXTAUTH_SECRET="{{ lookup('pipe', 'openssl rand -hex 32') }}"
+      NEXTAUTH_URL="https://{{ hostname }}.{{ domain }}"
+      NODE_ENV="production"
+  when: new_deploy
+
+- name: Install dependencies (incl. dev deps needed for build + seed)
+  ansible.builtin.command:
+    cmd: npm ci --no-audit --no-fund
+    chdir: /opt/sam
+  environment:
+    NODE_ENV: development
+
+- name: Generate the prisma client
+  ansible.builtin.command:
+    cmd: npx prisma generate
+    chdir: /opt/sam
+
+- name: Apply database migrations
+  ansible.builtin.command:
+    cmd: npx prisma migrate deploy
+    chdir: /opt/sam
+  environment:
+    DATABASE_URL: "file:/opt/sam/data/prod.db"
+
+- name: Build the Next.js app
+  ansible.builtin.command:
+    cmd: npm run build
+    chdir: /opt/sam
+
+- name: Fix ownership so the service user can read the build + write the DB
+  ansible.builtin.file:
+    path: /opt/sam
+    state: directory
+    owner: www-data
+    group: www-data
+    recurse: yes
+
+- name: Allow HTTP/HTTPS through ufw
+  ansible.builtin.command: "ufw allow {{ item }}/tcp"
+  register: ufw_result
+  changed_when: "'added' in ufw_result.stdout or 'updated' in ufw_result.stdout"
+  failed_when: false
+  loop:
+    - 80
+    - 443
+
+- name: Install the SAM systemd service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/sam.service
+    mode: '0644'
+    owner: root
+    group: root
+    content: |
+      [Unit]
+      Description=SAM — System Access Matrix (Next.js)
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=exec
+      User=www-data
+      Group=www-data
+      WorkingDirectory=/opt/sam
+      EnvironmentFile=/opt/sam/.env
+      ExecStartPre=/opt/sam/node_modules/.bin/prisma migrate deploy
+      ExecStart=/opt/sam/node_modules/.bin/next start -H 127.0.0.1 -p 18093
+      Restart=on-failure
+      RestartSec=3
+      StandardOutput=journal
+      StandardError=journal
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Enable and (re)start the SAM service
+  ansible.builtin.systemd:
+    name: sam.service
+    enabled: yes
+    state: restarted
+    daemon_reload: yes
+
+- name: Verify the app backend is serving its public endpoint
+  ansible.builtin.uri:
+    url: http://127.0.0.1:18093/
+    status_code: 200
+  register: health
+  retries: 20
+  delay: 3
+  until: health.status == 200
+
+- name: Check current user count
+  ansible.builtin.command:
+    cmd: >-
+      node -e "const{PrismaClient}=require('@prisma/client');(async()=>{const p=new PrismaClient();process.stdout.write(String(await p.user.count()))})().catch(()=>process.stdout.write('0'))"
+    chdir: /opt/sam
+  environment:
+    DATABASE_URL: "file:/opt/sam/data/prod.db"
+  register: user_count
+  changed_when: false
+  failed_when: false
+
+- name: Seed scenario users + content if the DB is empty
+  ansible.builtin.command:
+    cmd: npx tsx prisma/seed.ts
+    chdir: /opt/sam
+  environment:
+    DATABASE_URL: "file:/opt/sam/data/prod.db"
+  when: (user_count.stdout | default('0') | trim) in ['', '0']
+
+- name: Install nginx
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+    update_cache: yes
+
+- name: Create TLS cert directory
+  ansible.builtin.file:
+    path: /etc/ssl/range
+    state: directory
+    mode: '0700'
+
+- name: Generate self-signed TLS cert (shared range cert, first deploy only)
+  ansible.builtin.shell:
+    cmd: >
+      openssl req -x509 -nodes -sha256 -days 825 -newkey rsa:2048
+      -keyout /etc/ssl/range/key.pem -out /etc/ssl/range/cert.pem
+      -subj "/C=UK/CN={{ hostname }}.{{ domain }}"
+      -addext "subjectAltName=DNS:{{ hostname }}.{{ domain }}"
+    executable: /bin/bash
+    creates: /etc/ssl/range/cert.pem
+
+- name: Configure nginx TLS reverse proxy
+  ansible.builtin.copy:
+    dest: /etc/nginx/sites-available/sam.conf
+    content: |
+      server {
+          listen 80;
+          server_name {{ hostname }}.{{ domain }};
+          return 301 https://$host$request_uri;
+      }
+      server {
+          listen 443 ssl;
+          server_name {{ hostname }}.{{ domain }};
+
+          ssl_certificate     /etc/ssl/range/cert.pem;
+          ssl_certificate_key /etc/ssl/range/key.pem;
+
+          client_max_body_size 16m;
+
+          location / {
+              proxy_pass http://127.0.0.1:18093;
+              proxy_http_version 1.1;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection "upgrade";
+          }
+      }
+
+- name: Enable the SAM nginx site
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/sam.conf
+    dest: /etc/nginx/sites-enabled/sam.conf
+    state: link
+
+- name: Disable the default nginx site
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+
+- name: Reload nginx
+  ansible.builtin.systemd:
+    name: nginx
+    state: reloaded
+    enabled: yes
+
+- name: Verify HTTPS is serving through nginx
+  ansible.builtin.uri:
+    url: https://127.0.0.1/
+    validate_certs: no
+    headers:
+      Host: "{{ hostname }}.{{ domain }}"
+    status_code: 200
+  register: https_health
+  retries: 5
+  delay: 2
+  until: https_health.status == 200
+
+- name: Install boot-time update script
+  ansible.builtin.copy:
+    dest: /usr/local/bin/sam-update.sh
+    mode: '0755'
+    owner: root
+    group: root
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      cd /opt/sam
+      git fetch --quiet origin main
+      git reset --hard origin/main
+      npm ci --no-audit --no-fund
+      npx prisma generate
+      npx prisma migrate deploy
+      npm run build
+      chown -R www-data:www-data /opt/sam
+      systemctl restart sam.service
+
+- name: Install the sam-update systemd unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/sam-update.service
+    mode: '0644'
+    owner: root
+    group: root
+    content: |
+      [Unit]
+      Description=Pull SAM updates from git, rebuild, and restart the service
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=oneshot
+      WorkingDirectory=/opt/sam
+      EnvironmentFile=/opt/sam/.env
+      ExecStart=/usr/local/bin/sam-update.sh
+      StandardOutput=journal
+      StandardError=journal
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Enable the update unit on boot
+  ansible.builtin.systemd:
+    name: sam-update.service
+    enabled: yes
+    daemon_reload: yes

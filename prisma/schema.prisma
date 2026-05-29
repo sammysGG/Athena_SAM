@@ -1,0 +1,160 @@
+// SAM (System Access Matrix) — Donovian-language underground forum.
+// Scenario: pro-Donovia DDoS/hacktivist board fronted by LOCKJAW CERBERUS.
+// Posts are dual-language: Donovian (Cyrillic) primary + English translation.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  // Login email. Often a throwaway / protonmail / @sigaint-style address.
+  email        String   @unique
+  // Forum handle. Latin or Cyrillic.
+  username     String   @unique
+  displayName  String
+  passwordHash String
+  // "admin" runs the board. "moderator" can pin/lock. "vetted" passed entry
+  // checks. "user" is a new account.
+  role         String   @default("user")
+  // Self-claimed group affiliation shown as a badge under the avatar:
+  //   "LOCKJAW CERBERUS" | "VECTOR CERBERUS" | "FREELANCE" | null
+  affiliation  String?
+  // Reputation score — earned through accepted exploits / verified intel.
+  reputation   Int      @default(0)
+  postCount    Int      @default(0)
+  // Free-text signature appended to posts. May contain a PGP fingerprint or
+  // Telegram handle.
+  signature    String?
+  // Avatar URL (uploaded via /api/upload or external).
+  avatarUrl    String?
+  // Optional self-reported location. Often a country code or a city.
+  location     String?
+  // Optional self-reported PGP key fingerprint.
+  pgpKeyId     String?
+  // ISO timestamp of last seen activity, refreshed on each request.
+  lastSeenAt   DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  threads      Thread[]
+  posts        Post[]
+  sentPms      PrivateMessage[] @relation("PMsSent")
+  recvPms      PrivateMessage[] @relation("PMsReceived")
+}
+
+model Category {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  // Russian-primary category name.
+  name        String
+  // English translation surfaced when the user toggles language.
+  nameEn      String
+  description String
+  descriptionEn String
+  // Numeric sort order on the forum index.
+  order       Int     @default(100)
+  // Icon glyph / short string shown in the index (e.g. "DDoS", "C2", "0day").
+  icon        String?
+  // If true, only "vetted"/"admin"/"moderator" users see the category.
+  restricted  Boolean @default(false)
+  createdAt   DateTime @default(now())
+
+  threads     Thread[]
+}
+
+model Thread {
+  id           String   @id @default(cuid())
+  slug         String   @unique
+  // Russian-primary thread title.
+  title        String
+  // English translation of the title.
+  titleEn      String
+  categoryId   String
+  authorId     String
+  // Optional banner tag rendered next to the title — e.g.
+  // "OPERATION" | "TARGET" | "LEAK" | "RECRUITING" | "NEWS" | null.
+  tag          String?
+  pinned       Boolean  @default(false)
+  locked       Boolean  @default(false)
+  views        Int      @default(0)
+  // Denormalised last-reply pointer for cheap index rendering.
+  lastReplyAt  DateTime @default(now())
+  lastReplyBy  String?
+  createdAt    DateTime @default(now())
+
+  category     Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  author       User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  posts        Post[]
+
+  @@index([categoryId, lastReplyAt])
+  @@index([pinned, lastReplyAt])
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  threadId  String
+  authorId  String
+  // Russian-primary body, plain text with blank-line-separated paragraphs.
+  body      String
+  // English translation surfaced via the language toggle.
+  bodyEn    String
+  // Optional attached image URL (screenshots of "victim" sites, etc).
+  imageUrl  String?
+  // Up/down rep applied by other vetted users — denormalised counts.
+  upvotes   Int      @default(0)
+  downvotes Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  thread    Thread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  author    User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
+}
+
+model PrivateMessage {
+  id         String   @id @default(cuid())
+  senderId   String
+  receiverId String
+  subject    String
+  body       String
+  readAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  sender     User @relation("PMsSent",     fields: [senderId],   references: [id], onDelete: Cascade)
+  receiver   User @relation("PMsReceived", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([receiverId, createdAt])
+}
+
+// Hacktivist "operations claim" — surfaces on the front page sidebar and
+// is referenced from threads. Used by the scenario to link forum chatter
+// to real (in-exercise) DDoS / defacement events.
+model Operation {
+  id          String   @id @default(cuid())
+  // Operation codename in Cyrillic.
+  codename    String
+  codenameEn  String
+  // Short description of the claimed activity.
+  summary     String
+  summaryEn   String
+  // Country of the alleged target (e.g. "Pirtuni", "Otso", "Olvana").
+  targetCountry String?
+  // What was hit: e.g. "Banking", "Government", "Energy", "Media".
+  targetSector String?
+  // Self-claimed status: "PLANNED" | "ACTIVE" | "COMPLETED" | "FAILED".
+  status      String   @default("COMPLETED")
+  // Optional cross-link to a forum thread where the op was claimed.
+  threadId    String?
+  // Codenames of co-claiming groups, comma-separated.
+  coClaimants String?
+  claimedAt   DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@index([claimedAt])
+}

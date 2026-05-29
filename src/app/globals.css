@@ -1,0 +1,158 @@
+@import "tailwindcss";
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: #0a0d10;
+  color: #c9d2d8;
+  font-family: var(--font-mono), "JetBrains Mono", "Fira Mono", monospace;
+  background-image:
+    radial-gradient(circle at 20% 10%, rgba(34, 197, 94, 0.04), transparent 40%),
+    radial-gradient(circle at 80% 80%, rgba(239, 68, 68, 0.05), transparent 45%),
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.012) 0px,
+      rgba(255, 255, 255, 0.012) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+}
+
+@theme {
+  /* Darkweb / underground board palette. */
+  --color-bg: #0a0d10;
+  --color-panel: #11161b;
+  --color-panel-2: #161c22;
+  --color-line: #1f2731;
+  --color-line-2: #2a3340;
+  --color-ink: #d6dde4;
+  --color-muted: #6a7a8a;
+  --color-accent: #ff3b3b;     /* lockjaw red */
+  --color-accent-2: #b30f0f;
+  --color-go: #22c55e;          /* terminal green */
+  --color-warn: #f59e0b;
+  --color-info: #4f9eff;
+  --color-cerb: #ff3b3b;
+
+  --breakpoint-xsm: 425px;
+  --breakpoint-xxl: 1440px;
+}
+
+@layer utilities {
+  .container {
+    @apply w-full max-w-[82rem] mx-auto px-4 sm:px-6;
+  }
+
+  .panel {
+    @apply bg-[color:var(--color-panel)] border border-[color:var(--color-line)];
+  }
+  .panel-2 {
+    @apply bg-[color:var(--color-panel-2)] border border-[color:var(--color-line)];
+  }
+  .hrule {
+    @apply border-b border-[color:var(--color-line)];
+  }
+
+  .glow-red {
+    text-shadow: 0 0 6px rgba(255, 59, 59, 0.55), 0 0 14px rgba(255, 59, 59, 0.25);
+  }
+  .glow-green {
+    text-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
+  }
+
+  /* CRT scanlines overlay for the masthead. */
+  .scanlines::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.22) 0px,
+      rgba(0, 0, 0, 0.22) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    mix-blend-mode: multiply;
+  }
+
+  /* Blinking terminal cursor. */
+  .blink::after {
+    content: "▌";
+    margin-left: 2px;
+    animation: blink 1s steps(1) infinite;
+    color: var(--color-go);
+  }
+  @keyframes blink {
+    50% { opacity: 0; }
+  }
+
+  .chip {
+    @apply inline-block text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm border;
+    border-color: var(--color-line-2);
+    color: var(--color-muted);
+  }
+  .chip-red {
+    color: var(--color-accent);
+    border-color: rgba(255, 59, 59, 0.45);
+    background: rgba(255, 59, 59, 0.06);
+  }
+  .chip-green {
+    color: var(--color-go);
+    border-color: rgba(34, 197, 94, 0.4);
+    background: rgba(34, 197, 94, 0.06);
+  }
+  .chip-warn {
+    color: var(--color-warn);
+    border-color: rgba(245, 158, 11, 0.4);
+    background: rgba(245, 158, 11, 0.06);
+  }
+  .chip-info {
+    color: var(--color-info);
+    border-color: rgba(79, 158, 255, 0.4);
+    background: rgba(79, 158, 255, 0.06);
+  }
+
+  .link-red {
+    @apply text-[color:var(--color-accent)] hover:underline;
+  }
+
+  /* Pre-rendered post body — preserve newlines. */
+  .post-body {
+    white-space: pre-wrap;
+    line-height: 1.55;
+    color: #c5cdd4;
+  }
+  .post-body a {
+    color: var(--color-info);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+}
+
+@layer base {
+  a { color: inherit; }
+  h1, h2, h3, h4 {
+    color: #e6ecf1;
+    letter-spacing: -0.01em;
+  }
+  h1 { @apply text-2xl md:text-3xl font-semibold; }
+  h2 { @apply text-xl md:text-2xl font-semibold; }
+  h3 { @apply text-lg md:text-xl font-semibold; }
+  p, li, td, span { color: inherit; }
+
+  ::selection {
+    background: rgba(255, 59, 59, 0.4);
+    color: #fff;
+  }
+
+  /* Custom scrollbar for the dark theme. */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: #0a0d10; }
+  ::-webkit-scrollbar-thumb { background: #1f2731; border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: #2a3340; }
+}
