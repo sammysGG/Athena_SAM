@@ -27,6 +27,7 @@ type SeedUser = {
   affiliation?: string | null;
   reputation?: number;
   postCount?: number;
+  passwordHash?: string;
   signature?: string | null;
   location?: string | null;
   pgpKeyId?: string | null;
@@ -185,6 +186,7 @@ const USERS: SeedUser[] = [
     affiliation: "FREELANCE",
     reputation: 873,
     postCount: 311,
+    passwordHash: "$2a$10$ux3IlgzUZvR4JfdWsjjwG.XHh5RjdEBN3w.uxOUBXe81uJVMmSbbq",
     signature:
       "НАТО — не страна, а склейка интересов. Бьём по швам, а не по броне.\nцель одна: подорвать целостность блока изнутри.",
     location: "—",
@@ -2193,7 +2195,7 @@ async function main() {
         username: u.username,
         displayName: u.displayName,
         email: u.email.toLowerCase(),
-        passwordHash: PASSWORD_HASH,
+        passwordHash: u.passwordHash || PASSWORD_HASH,
         role: u.role ?? "user",
         affiliation: u.affiliation ?? null,
         reputation: u.reputation ?? 0,

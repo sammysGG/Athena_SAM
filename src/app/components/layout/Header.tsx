@@ -82,7 +82,7 @@ export default function Header() {
                   </Link>
                 )}
                 <button
-                  onClick={() => signOut({ callbackUrl: "/" })}
+                  onClick={async () => { await signOut({ redirect: false }); window.location.href = "/"; }}
                   className="text-[color:var(--color-muted)] hover:text-[color:var(--color-accent)]"
                 >
                   {t("Выход", "Logout")}

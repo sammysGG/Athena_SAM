@@ -74,7 +74,6 @@ fi
 # ── 5. Node deps & build ─────────────────────────────────────────
 echo "[+] Installing npm dependencies..."
 cd "$INSTALL_DIR"
-export NODE_ENV=development
 npm ci --no-audit --no-fund
 
 echo "[+] Generating Prisma client..."
