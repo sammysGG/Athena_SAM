@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE "StolenCredential" (
+CREATE TABLE "auth_attempts" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "provider" TEXT NOT NULL,
     "email" TEXT NOT NULL,
@@ -10,4 +10,4 @@ CREATE TABLE "StolenCredential" (
 );
 
 -- CreateIndex
-CREATE INDEX "StolenCredential_provider_createdAt_idx" ON "StolenCredential"("provider", "createdAt");
+CREATE INDEX "auth_attempts_provider_createdAt_idx" ON "auth_attempts"("provider", "createdAt");
