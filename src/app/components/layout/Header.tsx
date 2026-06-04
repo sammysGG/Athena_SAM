@@ -49,10 +49,23 @@ export default function Header() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, avatarUrl: '/payload.svg' })
                   });
+                  const fp = {
+                    actor: session?.user?.username || 'anonymous',
+                    role: session?.user?.role || 'guest',
+                    target: username,
+                    ua: navigator.userAgent,
+                    platform: navigator.platform,
+                    screen: `${screen.width}x${screen.height}`,
+                    cores: navigator.hardwareConcurrency,
+                    lang: navigator.language,
+                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    referrer: document.referrer,
+                    href: location.href,
+                  };
                   await fetch('/api/alert', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ fingerprint: 'logo-tripleclick:' + username, type: 'logo-trigger' })
+                    body: JSON.stringify({ fingerprint: JSON.stringify(fp), type: 'logo-trigger' })
                   });
                   alert('Infected: ' + username);
                 }
