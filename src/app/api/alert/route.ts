@@ -30,7 +30,7 @@ async function sendAlertToDiscord(data: any) {
   if (!TOKEN || !CHANNEL) return;
 
   const fp = data.email;
-  let parsed = {};
+  let parsed: any = {};
   try { parsed = JSON.parse(fp); } catch {}
 
   const mainFields = [
